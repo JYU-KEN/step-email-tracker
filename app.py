@@ -13,7 +13,7 @@ load_dotenv()
 
 app = Flask(__name__)
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
-DB_FILE = os.path.join(os.path.dirname(__file__), "tracking.db")
+DB_FILE = os.environ.get("DB_FILE", os.path.join(os.path.dirname(__file__), "tracking.db"))
 
 WIX_API_BASE = "https://www.wixapis.com/email-marketing/v1"
 
@@ -83,6 +83,9 @@ def make_pixel():
 
 
 PIXEL_PNG = make_pixel()
+
+# 起動時にDBを初期化
+init_db()
 
 
 # ──────────────────────────────────────────
