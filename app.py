@@ -85,7 +85,7 @@ def init_db():
             clicked_at TIMESTAMPTZ DEFAULT NOW())""")
         conn.run("""CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY, value TEXT)""")
-        conn.commit()
+        
     else:
         conn.execute("""CREATE TABLE IF NOT EXISTS email_opens (
             id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
@@ -94,7 +94,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
             url TEXT, ip TEXT, clicked_at TEXT DEFAULT (datetime('now', '+9 hours')))""")
         conn.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
-        conn.commit()
+        
     conn.close()
 
 
@@ -132,11 +132,11 @@ def track_open(day):
         if USE_POSTGRES:
             conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (%s, %s, %s)",
                      day, request.remote_addr, request.user_agent.string[:200])
-            conn.commit()
+            
         else:
             conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
                          (day, request.remote_addr, request.user_agent.string[:200]))
-            conn.commit()
+            
         conn.close()
     except Exception:
         pass
@@ -153,11 +153,11 @@ def track_click(day):
         if USE_POSTGRES:
             conn.run("INSERT INTO link_clicks (day, url, ip) VALUES (%s, %s, %s)",
                      day, url[:500], request.remote_addr)
-            conn.commit()
+            
         else:
             conn.execute("INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
                          (day, url[:500], request.remote_addr))
-            conn.commit()
+            
         conn.close()
     except Exception:
         pass
@@ -217,10 +217,10 @@ def set_sent():
         if USE_POSTGRES:
             conn.run("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                      'total_sent', str(total_sent))
-            conn.commit()
+            
         else:
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
-            conn.commit()
+            
         conn.close()
         return jsonify({"success": True, "total_sent": total_sent})
     except Exception as e:
