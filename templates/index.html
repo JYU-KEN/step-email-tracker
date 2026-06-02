@@ -156,6 +156,20 @@
 
 <div class="container">
 
+  <!-- トラッキング統計 -->
+  <div class="table-card" style="margin-bottom:32px;">
+    <div class="table-header">
+      <h2>👁️ ステップメール 開封トラッキング（リアルタイム）</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a href="/pixel-urls" style="font-size:13px;color:#3b6ef6;text-decoration:none;font-weight:600;">📋 ピクセルURL一覧</a>
+        <button class="refresh-btn" onclick="loadTracking()">🔄 更新</button>
+      </div>
+    </div>
+    <div id="tracking-container">
+      <div class="loading"><div class="spinner"></div><br>読み込み中...</div>
+    </div>
+  </div>
+
   <!-- サマリーカード -->
   <div class="summary-grid">
     <div class="summary-card">
@@ -351,8 +365,42 @@ function renderTable(campaigns) {
   `;
 }
 
+async function loadTracking() {
+  try {
+    const res = await fetch('/api/tracking');
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById('tracking-container').innerHTML = `<div class="error-msg">⚠️ ${data.error}</div>`;
+      return;
+    }
+    const rows = data.tracking.map(t => `
+      <tr>
+        <td class="subject-cell"><div class="subject-text">${t.label}</div></td>
+        <td class="num-cell">${t.opens.toLocaleString()}<div class="num-label">開封</div></td>
+        <td class="num-cell">${t.clicks.toLocaleString()}<div class="num-label">クリック</div></td>
+        <td class="rate-cell">
+          <div class="rate-bar-bg"><div class="rate-bar open-bar" style="width:${Math.min(t.opens*2,100)}%"></div></div>
+        </td>
+      </tr>
+    `).join('');
+    document.getElementById('tracking-container').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>メール</th>
+          <th style="text-align:right">開封数</th>
+          <th style="text-align:right">クリック数</th>
+          <th>開封グラフ</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('tracking-container').innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
+  }
+}
+
 // 起動時に自動読み込み
 loadData();
+loadTracking();
 </script>
 </body>
 </html>
