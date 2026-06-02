@@ -61,6 +61,12 @@ def init_db():
             clicked_at TEXT DEFAULT (datetime('now', '+9 hours'))
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -144,8 +150,11 @@ def api_tracking():
             GROUP BY day
             ORDER BY day
         """).fetchall()
+        # 登録者数（送信数）を取得
+        sent_row = conn.execute("SELECT value FROM settings WHERE key='total_sent'").fetchone()
         conn.close()
 
+        total_sent = int(sent_row['value']) if sent_row else 0
         opens_map = {r['day']: r['opens'] for r in rows}
         clicks_map = {r['day']: r['clicks'] for r in clicks}
 
@@ -153,13 +162,34 @@ def api_tracking():
         for day, label in sorted(STEP_EMAILS.items()):
             o = opens_map.get(day, 0)
             c = clicks_map.get(day, 0)
+            open_rate = round(o / total_sent * 100, 1) if total_sent > 0 else 0
+            click_rate = round(c / total_sent * 100, 1) if total_sent > 0 else 0
             result.append({
                 "day": day,
                 "label": label,
+                "sent": total_sent,
                 "opens": o,
                 "clicks": c,
+                "open_rate": open_rate,
+                "click_rate": click_rate,
             })
-        return jsonify({"tracking": result})
+        return jsonify({"tracking": result, "total_sent": total_sent})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/tracking/set_sent', methods=['POST'])
+def set_sent():
+    """登録者数（送信数）を設定"""
+    try:
+        data = request.get_json()
+        total_sent = int(data.get('total_sent', 0))
+        conn = get_db()
+        conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('total_sent', ?)", (str(total_sent),))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "total_sent": total_sent})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
