@@ -144,8 +144,8 @@ def track_open(day):
     try:
         conn = get_db()
         if USE_POSTGRES:
-            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (%s, %s, %s)",
-                     day, request.remote_addr, request.user_agent.string[:200])
+            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)",
+                     d=day, i=request.remote_addr, u=request.user_agent.string[:200])
             conn.run("COMMIT")
         else:
             conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
@@ -165,8 +165,8 @@ def track_click(day):
     try:
         conn = get_db()
         if USE_POSTGRES:
-            conn.run("INSERT INTO link_clicks (day, url, ip) VALUES (%s, %s, %s)",
-                     day, url[:500], request.remote_addr)
+            conn.run("INSERT INTO link_clicks (day, url, ip) VALUES (:d, :u, :i)",
+                     d=day, u=url[:500], i=request.remote_addr)
             conn.run("COMMIT")
         else:
             conn.execute("INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
@@ -229,8 +229,8 @@ def set_sent():
         total_sent = int(data.get('total_sent', 0))
         conn = get_db()
         if USE_POSTGRES:
-            conn.run("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-                     'total_sent', str(total_sent))
+            conn.run("INSERT INTO settings (key, value) VALUES (:k, :v) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                     k='total_sent', v=str(total_sent))
             conn.run("COMMIT")
         else:
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
