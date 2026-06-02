@@ -138,8 +138,8 @@ def track_open(day):
                          (day, request.remote_addr, request.user_agent.string[:200]))
             
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"track_open error: {e}", flush=True)
     return Response(PIXEL_PNG, mimetype='image/png',
                     headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
 
