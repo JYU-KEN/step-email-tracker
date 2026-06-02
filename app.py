@@ -18,6 +18,7 @@ DB_FILE = os.environ.get("DB_FILE", os.path.join(os.path.dirname(__file__), "tra
 WIX_API_BASE = "https://www.wixapis.com/email-marketing/v1"
 
 STEP_EMAILS = {
+    0: "サンクスメール - 判定表ダウンロードありがとうございます",
     1: "Day1 - 【まだ開いていないなら】30秒だけ見てください",
     2: "Day2 - そのまま入力すると、ただの自己評価で終わります",
     3: "Day3 - 80点×4でも、2回に1回は断られます",
@@ -28,7 +29,6 @@ STEP_EMAILS = {
     8: "Day8 - 動画を見ただけでは、商談は変わりません",
     9: "Day9 - わかっているのに、現場でとっさに動けない",
     10: "Day10 - 今月3名限定：あなたの商談を直接見ます",
-    11: "Day7昼 - 【本日締切】リマインド",
 }
 
 
