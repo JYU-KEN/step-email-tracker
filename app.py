@@ -11,8 +11,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_POSTGRES = bool(DATABASE_URL)
 
 if USE_POSTGRES:
-    import psycopg2
-    import psycopg2.extras
+    import pg8000.native
 else:
     import sqlite3
 
@@ -45,7 +44,16 @@ STEP_EMAILS = {
 # ──────────────────────────────────────────
 def get_db():
     if USE_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL)
+        import urllib.parse as urlparse
+        url = urlparse.urlparse(DATABASE_URL)
+        conn = pg8000.native.Connection(
+            host=url.hostname,
+            port=url.port or 5432,
+            database=url.path[1:],
+            user=url.username,
+            password=url.password,
+            ssl_context=True,
+        )
         return conn
     else:
         conn = sqlite3.connect(DB_FILE)
@@ -59,40 +67,34 @@ def db_execute(conn, sql, params=()):
         sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
         sql = sql.replace("datetime('now', '+9 hours')", "NOW() AT TIME ZONE 'Asia/Tokyo'")
         sql = sql.replace("?", "%s")
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(sql, params)
-        return cur
+        sql = sql.replace("INSERT OR REPLACE", "INSERT")
+        result = conn.run(sql, *params) if params else conn.run(sql)
+        return type('Result', (), {'fetchall': lambda s: result, 'fetchone': lambda s: result[0] if result else None})()
     else:
         return conn.execute(sql, params)
 
 
 def init_db():
     conn = get_db()
-    db_execute(conn, """
-        CREATE TABLE IF NOT EXISTS email_opens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            day INTEGER NOT NULL,
-            ip TEXT,
-            user_agent TEXT,
-            opened_at TEXT DEFAULT (datetime('now', '+9 hours'))
-        )
-    """)
-    db_execute(conn, """
-        CREATE TABLE IF NOT EXISTS link_clicks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            day INTEGER NOT NULL,
-            url TEXT,
-            ip TEXT,
-            clicked_at TEXT DEFAULT (datetime('now', '+9 hours'))
-        )
-    """)
-    db_execute(conn, """
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    """)
-    conn.commit()
+    if USE_POSTGRES:
+        conn.run("""CREATE TABLE IF NOT EXISTS email_opens (
+            id SERIAL PRIMARY KEY, day INTEGER NOT NULL, ip TEXT, user_agent TEXT,
+            opened_at TIMESTAMPTZ DEFAULT NOW())""")
+        conn.run("""CREATE TABLE IF NOT EXISTS link_clicks (
+            id SERIAL PRIMARY KEY, day INTEGER NOT NULL, url TEXT, ip TEXT,
+            clicked_at TIMESTAMPTZ DEFAULT NOW())""")
+        conn.run("""CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY, value TEXT)""")
+        conn.commit()
+    else:
+        conn.execute("""CREATE TABLE IF NOT EXISTS email_opens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+            ip TEXT, user_agent TEXT, opened_at TEXT DEFAULT (datetime('now', '+9 hours')))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS link_clicks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
+            url TEXT, ip TEXT, clicked_at TEXT DEFAULT (datetime('now', '+9 hours')))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
+        conn.commit()
     conn.close()
 
 
@@ -127,9 +129,14 @@ def track_open(day):
     """メール開封トラッキングピクセル"""
     try:
         conn = get_db()
-        db_execute(conn, "INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
-                   (day, request.remote_addr, request.user_agent.string[:200]))
-        conn.commit()
+        if USE_POSTGRES:
+            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (%s, %s, %s)",
+                     day, request.remote_addr, request.user_agent.string[:200])
+            conn.commit()
+        else:
+            conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
+                         (day, request.remote_addr, request.user_agent.string[:200]))
+            conn.commit()
         conn.close()
     except Exception:
         pass
@@ -143,9 +150,14 @@ def track_click(day):
     url = request.args.get('url', '/')
     try:
         conn = get_db()
-        db_execute(conn, "INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
-                   (day, url[:500], request.remote_addr))
-        conn.commit()
+        if USE_POSTGRES:
+            conn.run("INSERT INTO link_clicks (day, url, ip) VALUES (%s, %s, %s)",
+                     day, url[:500], request.remote_addr)
+            conn.commit()
+        else:
+            conn.execute("INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
+                         (day, url[:500], request.remote_addr))
+            conn.commit()
         conn.close()
     except Exception:
         pass
@@ -159,10 +171,17 @@ def track_click(day):
 def api_tracking():
     try:
         conn = get_db()
-        rows = db_execute(conn, "SELECT day, COUNT(*) as opens FROM email_opens GROUP BY day ORDER BY day").fetchall()
-        clicks = db_execute(conn, "SELECT day, COUNT(*) as clicks FROM link_clicks GROUP BY day ORDER BY day").fetchall()
-        sent_row = db_execute(conn, "SELECT value FROM settings WHERE key='total_sent'").fetchone()
+        if USE_POSTGRES:
+            rows = [{"day": r[0], "opens": r[1]} for r in conn.run("SELECT day, COUNT(*) as opens FROM email_opens GROUP BY day ORDER BY day")]
+            clicks_raw = [{"day": r[0], "clicks": r[1]} for r in conn.run("SELECT day, COUNT(*) as clicks FROM link_clicks GROUP BY day ORDER BY day")]
+            sent_raw = conn.run("SELECT value FROM settings WHERE key='total_sent'")
+            sent_row = {"value": sent_raw[0][0]} if sent_raw else None
+        else:
+            rows = conn.execute("SELECT day, COUNT(*) as opens FROM email_opens GROUP BY day ORDER BY day").fetchall()
+            clicks_raw = conn.execute("SELECT day, COUNT(*) as clicks FROM link_clicks GROUP BY day ORDER BY day").fetchall()
+            sent_row = conn.execute("SELECT value FROM settings WHERE key='total_sent'").fetchone()
         conn.close()
+        clicks = clicks_raw
 
         total_sent = int(sent_row['value']) if sent_row else 0
         opens_map = {r['day']: r['opens'] for r in rows}
@@ -196,11 +215,12 @@ def set_sent():
         total_sent = int(data.get('total_sent', 0))
         conn = get_db()
         if USE_POSTGRES:
-            db_execute(conn, "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-                       ('total_sent', str(total_sent)))
+            conn.run("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                     'total_sent', str(total_sent))
+            conn.commit()
         else:
-            db_execute(conn, "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
-        conn.commit()
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
+            conn.commit()
         conn.close()
         return jsonify({"success": True, "total_sent": total_sent})
     except Exception as e:
