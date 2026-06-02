@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>トラッキングピクセルURL一覧</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; color: #222; }
+  header { background: #1a2d4e; color: white; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header a { color: #a0b4d0; font-size: 13px; text-decoration: none; }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  .card { background: white; border-radius: 10px; padding: 24px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); margin-bottom: 24px; }
+  h2 { font-size: 18px; color: #1a2d4e; margin-bottom: 8px; }
+  .desc { font-size: 14px; color: #666; margin-bottom: 20px; line-height: 1.6; }
+  .day-item { border: 1px solid #e8ecf0; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .day-label { font-weight: 700; color: #1a2d4e; font-size: 14px; margin-bottom: 8px; }
+  .pixel-tag { background: #f0f4f8; border-radius: 6px; padding: 10px 14px; font-family: monospace; font-size: 12px; color: #333; word-break: break-all; margin-bottom: 8px; }
+  .copy-btn { background: #3b6ef6; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .copy-btn:hover { background: #2557d6; }
+  .copy-btn.copied { background: #27ae60; }
+  .step { background: #fff8e1; border-left: 4px solid #f39c12; padding: 16px; border-radius: 0 8px 8px 0; margin-bottom: 20px; font-size: 14px; line-height: 1.8; color: #555; }
+  .step strong { color: #1a2d4e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📧 トラッキングピクセルURL一覧</h1>
+  <a href="/">← ダッシュボードに戻る</a>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>📋 各メールに貼るトラッキングコード</h2>
+    <p class="desc">
+      以下のHTMLコードを各ステップメールの本文に貼り付けてください。<br>
+      メールが開封されると自動的にカウントされ、ダッシュボードに表示されます。
+    </p>
+
+    <div class="step">
+      <strong>Wixメールへの貼り方：</strong><br>
+      1. Wixオートメーション → 対象のメール → 「編集」<br>
+      2. 左側パネルから「HTML」パーツをドラッグ＆ドロップ<br>
+      3. 以下のコードをそのままペースト<br>
+      4. 「適用」→「保存して続行する」
+    </div>
+
+    {% for day, label in step_emails.items()|sort %}
+    <div class="day-item">
+      <div class="day-label">{{ label }}</div>
+      <div class="pixel-tag" id="code-{{ day }}">&lt;img src="{{ urls[day] }}" width="1" height="1" style="display:block;width:1px;height:1px;" /&gt;</div>
+      <button class="copy-btn" onclick="copyCode({{ day }})">📋 コピー</button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function copyCode(day) {
+  const el = document.getElementById('code-' + day);
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = el.nextElementSibling;
+    btn.textContent = '✅ コピーしました';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 コピー';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>

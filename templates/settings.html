@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>設定 - ステップメール管理</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: white; border-radius: 12px; padding: 40px; width: 480px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  h1 { font-size: 22px; color: #1a2d4e; margin-bottom: 8px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+  input { width: 100%; border: 1.5px solid #dde3ea; border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  input:focus { border-color: #3b6ef6; }
+  .field { margin-bottom: 20px; }
+  .hint { font-size: 12px; color: #888; margin-top: 6px; }
+  .btn { width: 100%; background: #3b6ef6; color: white; border: none; border-radius: 8px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+  .btn:hover { background: #2a5ee0; }
+  .error { background: #fff0f0; border: 1px solid #f5c0c0; border-radius: 8px; padding: 12px 16px; color: #c0392b; font-size: 13px; margin-bottom: 20px; }
+  .success { background: #f0fff4; border: 1px solid #b0e8c0; border-radius: 8px; padding: 12px 16px; color: #27ae60; font-size: 13px; margin-bottom: 20px; }
+  .back { display: block; text-align: center; margin-top: 20px; color: #3b6ef6; font-size: 13px; text-decoration: none; }
+  .steps { background: #f8faff; border-radius: 8px; padding: 16px; margin-bottom: 24px; font-size: 13px; color: #555; line-height: 1.8; }
+  .steps strong { color: #1a2d4e; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚙️ Wix API 設定</h1>
+  <p class="subtitle">WixのAPIキーとサイトIDを入力してください</p>
+
+  <div class="steps">
+    <strong>APIキーの取得方法：</strong><br>
+    1. Wixダッシュボード → 左メニュー「設定」<br>
+    2. 「詳細設定」→「API Keys」<br>
+    3. 「Generate API Key」→ Email Marketing の権限をON<br>
+    4. 生成されたキーをコピー<br><br>
+    <strong>サイトIDの取得方法：</strong><br>
+    Wixダッシュボードの URL に含まれる UUID<br>
+    例: dashboard/<strong>8c62a8d6-xxxx-xxxx-xxxx-xxxxxxxxxxxx</strong>/...
+  </div>
+
+  {% if error %}
+  <div class="error">⚠️ {{ error }}</div>
+  {% endif %}
+  {% if success %}
+  <div class="success">✅ {{ success }}</div>
+  {% endif %}
+
+  <form method="POST">
+    <div class="field">
+      <label>Wix APIキー</label>
+      <input type="password" name="api_key" value="{{ config.api_key }}" placeholder="IST.eyJ..." required>
+      <p class="hint">「IST.eyJ...」で始まるキーです</p>
+    </div>
+    <div class="field">
+      <label>サイトID</label>
+      <input type="text" name="site_id" value="{{ config.site_id }}" placeholder="8c62a8d6-182f-422b-9639-bc85e6bb2d9b" required>
+      <p class="hint">ダッシュボードURLに含まれる ID（例：8c62a8d6-182f-...）</p>
+    </div>
+    <button type="submit" class="btn">接続テストして保存</button>
+  </form>
+
+  {% if config.api_key %}
+  <a class="back" href="/">← ダッシュボードに戻る</a>
+  {% endif %}
+</div>
+</body>
+</html>
