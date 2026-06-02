@@ -1,19 +1,27 @@
 import os
 import json
-import sqlite3
 import struct
 import zlib
-import base64
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 from dotenv import load_dotenv
 import requests
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+USE_POSTGRES = bool(DATABASE_URL)
+
+if USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+else:
+    import sqlite3
 
 load_dotenv()
 
 app = Flask(__name__)
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 DB_FILE = os.environ.get("DB_FILE", os.path.join(os.path.dirname(__file__), "tracking.db"))
+
 
 WIX_API_BASE = "https://www.wixapis.com/email-marketing/v1"
 
@@ -36,14 +44,31 @@ STEP_EMAILS = {
 # データベース
 # ──────────────────────────────────────────
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if USE_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    else:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+def db_execute(conn, sql, params=()):
+    """DB種別を吸収して実行"""
+    if USE_POSTGRES:
+        sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        sql = sql.replace("datetime('now', '+9 hours')", "NOW() AT TIME ZONE 'Asia/Tokyo'")
+        sql = sql.replace("?", "%s")
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql, params)
+        return cur
+    else:
+        return conn.execute(sql, params)
 
 
 def init_db():
     conn = get_db()
-    conn.execute("""
+    db_execute(conn, """
         CREATE TABLE IF NOT EXISTS email_opens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             day INTEGER NOT NULL,
@@ -52,7 +77,7 @@ def init_db():
             opened_at TEXT DEFAULT (datetime('now', '+9 hours'))
         )
     """)
-    conn.execute("""
+    db_execute(conn, """
         CREATE TABLE IF NOT EXISTS link_clicks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             day INTEGER NOT NULL,
@@ -61,7 +86,7 @@ def init_db():
             clicked_at TEXT DEFAULT (datetime('now', '+9 hours'))
         )
     """)
-    conn.execute("""
+    db_execute(conn, """
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -102,10 +127,8 @@ def track_open(day):
     """メール開封トラッキングピクセル"""
     try:
         conn = get_db()
-        conn.execute(
-            "INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
-            (day, request.remote_addr, request.user_agent.string[:200])
-        )
+        db_execute(conn, "INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
+                   (day, request.remote_addr, request.user_agent.string[:200]))
         conn.commit()
         conn.close()
     except Exception:
@@ -120,10 +143,8 @@ def track_click(day):
     url = request.args.get('url', '/')
     try:
         conn = get_db()
-        conn.execute(
-            "INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
-            (day, url[:500], request.remote_addr)
-        )
+        db_execute(conn, "INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
+                   (day, url[:500], request.remote_addr))
         conn.commit()
         conn.close()
     except Exception:
@@ -138,20 +159,9 @@ def track_click(day):
 def api_tracking():
     try:
         conn = get_db()
-        rows = conn.execute("""
-            SELECT day, COUNT(*) as opens
-            FROM email_opens
-            GROUP BY day
-            ORDER BY day
-        """).fetchall()
-        clicks = conn.execute("""
-            SELECT day, COUNT(*) as clicks
-            FROM link_clicks
-            GROUP BY day
-            ORDER BY day
-        """).fetchall()
-        # 登録者数（送信数）を取得
-        sent_row = conn.execute("SELECT value FROM settings WHERE key='total_sent'").fetchone()
+        rows = db_execute(conn, "SELECT day, COUNT(*) as opens FROM email_opens GROUP BY day ORDER BY day").fetchall()
+        clicks = db_execute(conn, "SELECT day, COUNT(*) as clicks FROM link_clicks GROUP BY day ORDER BY day").fetchall()
+        sent_row = db_execute(conn, "SELECT value FROM settings WHERE key='total_sent'").fetchone()
         conn.close()
 
         total_sent = int(sent_row['value']) if sent_row else 0
@@ -185,8 +195,11 @@ def set_sent():
         data = request.get_json()
         total_sent = int(data.get('total_sent', 0))
         conn = get_db()
-        conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('total_sent', ?)", (str(total_sent),))
+        if USE_POSTGRES:
+            db_execute(conn, "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                       ('total_sent', str(total_sent)))
+        else:
+            db_execute(conn, "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
         conn.commit()
         conn.close()
         return jsonify({"success": True, "total_sent": total_sent})
