@@ -262,7 +262,7 @@ def api_tracking_recent():
 @app.route('/pixel-urls')
 def pixel_urls():
     """各メールに貼るピクセルURLを表示"""
-    base = request.host_url.rstrip('/')
+    base = request.host_url.rstrip('/').replace('http://', 'https://')
     urls = {day: f"{base}/track/open/{day}" for day in STEP_EMAILS}
     return render_template('pixel_urls.html', urls=urls, step_emails=STEP_EMAILS, base=base)
 
