@@ -124,6 +124,20 @@ init_db()
 # ──────────────────────────────────────────
 # トラッキングエンドポイント
 # ──────────────────────────────────────────
+@app.route('/debug')
+def debug():
+    try:
+        conn = get_db()
+        if USE_POSTGRES:
+            count = conn.run("SELECT COUNT(*) FROM email_opens")[0][0]
+        else:
+            count = conn.execute("SELECT COUNT(*) FROM email_opens").fetchone()[0]
+        conn.close()
+        return jsonify({"use_postgres": USE_POSTGRES, "email_opens_count": count, "db_url_set": bool(DATABASE_URL)})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
 @app.route('/track/open/<int:day>')
 def track_open(day):
     """メール開封トラッキングピクセル"""
@@ -132,11 +146,10 @@ def track_open(day):
         if USE_POSTGRES:
             conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (%s, %s, %s)",
                      day, request.remote_addr, request.user_agent.string[:200])
-            
         else:
             conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
                          (day, request.remote_addr, request.user_agent.string[:200]))
-            
+            conn.commit()
         conn.close()
     except Exception as e:
         print(f"track_open error: {e}", flush=True)
