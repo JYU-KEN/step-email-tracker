@@ -146,6 +146,7 @@ def track_open(day):
         if USE_POSTGRES:
             conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (%s, %s, %s)",
                      day, request.remote_addr, request.user_agent.string[:200])
+            conn.run("COMMIT")
         else:
             conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
                          (day, request.remote_addr, request.user_agent.string[:200]))
@@ -166,7 +167,7 @@ def track_click(day):
         if USE_POSTGRES:
             conn.run("INSERT INTO link_clicks (day, url, ip) VALUES (%s, %s, %s)",
                      day, url[:500], request.remote_addr)
-            
+            conn.run("COMMIT")
         else:
             conn.execute("INSERT INTO link_clicks (day, url, ip) VALUES (?, ?, ?)",
                          (day, url[:500], request.remote_addr))
@@ -230,7 +231,7 @@ def set_sent():
         if USE_POSTGRES:
             conn.run("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
                      'total_sent', str(total_sent))
-            
+            conn.run("COMMIT")
         else:
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('total_sent', str(total_sent)))
             
