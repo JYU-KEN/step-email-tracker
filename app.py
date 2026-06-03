@@ -143,14 +143,24 @@ def track_open(day):
     """メール開封トラッキングピクセル"""
     try:
         conn = get_db()
+        ip = request.remote_addr
+        ua = request.user_agent.string[:200]
         if USE_POSTGRES:
-            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)",
-                     d=day, i=request.remote_addr, u=request.user_agent.string[:200])
-            conn.run("COMMIT")
+            # 同じIPから5分以内の重複はスキップ
+            recent = conn.run(
+                "SELECT COUNT(*) FROM email_opens WHERE day=:d AND ip=:i AND opened_at > NOW() - INTERVAL '5 minutes'",
+                d=day, i=ip)
+            if recent[0][0] == 0:
+                conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)",
+                         d=day, i=ip, u=ua)
+                conn.run("COMMIT")
         else:
-            conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)",
-                         (day, request.remote_addr, request.user_agent.string[:200]))
-            conn.commit()
+            recent = conn.execute(
+                "SELECT COUNT(*) FROM email_opens WHERE day=? AND ip=? AND opened_at > datetime('now','-5 minutes')",
+                (day, ip)).fetchone()[0]
+            if recent == 0:
+                conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
+                conn.commit()
         conn.close()
     except Exception as e:
         print(f"track_open error: {e}", flush=True)
