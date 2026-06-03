@@ -146,19 +146,19 @@ def track_open(day):
         ip = request.remote_addr
         ua = request.user_agent.string[:200]
         if USE_POSTGRES:
-            # 同じIPから5分以内の重複はスキップ
-            recent = conn.run(
-                "SELECT COUNT(*) FROM email_opens WHERE day=:d AND ip=:i AND opened_at > NOW() - INTERVAL '5 minutes'",
+            # 同じIPからの重複は一切カウントしない（1人1カウント）
+            already = conn.run(
+                "SELECT COUNT(*) FROM email_opens WHERE day=:d AND ip=:i",
                 d=day, i=ip)
-            if recent[0][0] == 0:
+            if already[0][0] == 0:
                 conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)",
                          d=day, i=ip, u=ua)
                 conn.run("COMMIT")
         else:
-            recent = conn.execute(
-                "SELECT COUNT(*) FROM email_opens WHERE day=? AND ip=? AND opened_at > datetime('now','-5 minutes')",
+            already = conn.execute(
+                "SELECT COUNT(*) FROM email_opens WHERE day=? AND ip=?",
                 (day, ip)).fetchone()[0]
-            if recent == 0:
+            if already == 0:
                 conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
                 conn.commit()
         conn.close()
