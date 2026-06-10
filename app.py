@@ -202,6 +202,24 @@ def api_tracking():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/tracking/reset_opens', methods=['POST'])
+def reset_opens():
+    try:
+        conn = get_db()
+        if USE_POSTGRES:
+            conn.run("DELETE FROM email_opens")
+            conn.run("DELETE FROM link_clicks")
+            conn.run("COMMIT")
+        else:
+            conn.execute("DELETE FROM email_opens")
+            conn.execute("DELETE FROM link_clicks")
+            conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/tracking/reset', methods=['POST'])
 def reset_tracking():
     try:
