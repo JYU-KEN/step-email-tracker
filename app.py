@@ -143,15 +143,11 @@ def track_open(day):
         ip = request.remote_addr
         ua = request.user_agent.string[:200]
         if USE_POSTGRES:
-            already = conn.run("SELECT COUNT(*) FROM email_opens WHERE day=:d AND ip=:i", d=day, i=ip)
-            if already[0][0] == 0:
-                conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)", d=day, i=ip, u=ua)
-                conn.run("COMMIT")
+            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)", d=day, i=ip, u=ua)
+            conn.run("COMMIT")
         else:
-            already = conn.execute("SELECT COUNT(*) FROM email_opens WHERE day=? AND ip=?", (day, ip)).fetchone()[0]
-            if already == 0:
-                conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
-                conn.commit()
+            conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
+            conn.commit()
         conn.close()
     except Exception as e:
         print(f"track_open error: {e}", flush=True)
