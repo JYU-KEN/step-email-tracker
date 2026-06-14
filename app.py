@@ -93,8 +93,17 @@ init_db()
 def register_subscriber():
     try:
         data = request.get_json() or {}
-        email = data.get('email', '')
+        email = (data.get('email', '') or '').strip().lower()
         conn = get_db()
+        # 同じメールアドレスが既に登録済みなら二重カウントしない
+        if email:
+            if USE_POSTGRES:
+                existing = conn.run("SELECT COUNT(*) FROM subscribers WHERE email = :e", e=email)[0][0]
+            else:
+                existing = conn.execute("SELECT COUNT(*) FROM subscribers WHERE email = ?", (email,)).fetchone()[0]
+            if existing > 0:
+                conn.close()
+                return jsonify({"success": True, "duplicate": True})
         if USE_POSTGRES:
             conn.run("INSERT INTO subscribers (email) VALUES (:e)", e=email)
             conn.run("COMMIT")
@@ -142,12 +151,17 @@ def track_open(day):
         conn = get_db()
         ip = request.remote_addr
         ua = request.user_agent.string[:200]
+        # 同じ人(IP)が同じメールを複数回開いても1回だけカウント（ユニーク開封）
         if USE_POSTGRES:
-            conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)", d=day, i=ip, u=ua)
-            conn.run("COMMIT")
+            already = conn.run("SELECT COUNT(*) FROM email_opens WHERE day=:d AND ip=:i", d=day, i=ip)
+            if already[0][0] == 0:
+                conn.run("INSERT INTO email_opens (day, ip, user_agent) VALUES (:d, :i, :u)", d=day, i=ip, u=ua)
+                conn.run("COMMIT")
         else:
-            conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
-            conn.commit()
+            already = conn.execute("SELECT COUNT(*) FROM email_opens WHERE day=? AND ip=?", (day, ip)).fetchone()[0]
+            if already == 0:
+                conn.execute("INSERT INTO email_opens (day, ip, user_agent) VALUES (?, ?, ?)", (day, ip, ua))
+                conn.commit()
         conn.close()
     except Exception as e:
         print(f"track_open error: {e}", flush=True)
