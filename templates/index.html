@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ステップメール 送信管理ダッシュボード</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ステップメール トラッキングダッシュボード</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f0f4f8; color: #222; }
@@ -17,6 +18,7 @@
     justify-content: space-between;
   }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; }
+  header .header-links { display: flex; gap: 18px; align-items: center; }
   header a { color: #a0b4d0; font-size: 13px; text-decoration: none; }
   header a:hover { color: white; }
 
@@ -27,7 +29,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-bottom: 32px;
+    margin-bottom: 28px;
   }
   .summary-card {
     background: white;
@@ -35,11 +37,12 @@
     padding: 20px 24px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.06);
   }
-  .summary-card .label { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card .label { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 600; letter-spacing: 0.3px; }
   .summary-card .value { font-size: 32px; font-weight: 700; color: #1a2d4e; }
   .summary-card .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
   .summary-card.highlight .value { color: #3b6ef6; }
   .summary-card.green .value { color: #27ae60; }
+  .summary-card.orange .value { color: #f39c12; }
 
   /* テーブル */
   .table-card {
@@ -55,8 +58,11 @@
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+    gap: 10px;
   }
   .table-header h2 { font-size: 16px; color: #1a2d4e; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
   .refresh-btn {
     background: #f0f4ff;
     color: #3b6ef6;
@@ -70,15 +76,27 @@
   }
   .refresh-btn:hover { background: #dde6ff; }
   .refresh-btn:disabled { opacity: 0.5; cursor: default; }
+  .link-btn { font-size:13px; color:#3b6ef6; text-decoration:none; font-weight:600; padding:7px 4px; }
+  .link-btn:hover { text-decoration: underline; }
 
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .info-bar {
+    padding: 11px 24px;
+    background: #f8faff;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 12.5px;
+    color: #5a6b85;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
   th {
     text-align: left;
     font-size: 11px;
     font-weight: 700;
     color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     padding: 12px 16px;
     background: #fafafa;
     border-bottom: 1px solid #f0f0f0;
@@ -87,17 +105,12 @@
   td { padding: 14px 16px; border-bottom: 1px solid #f7f7f7; font-size: 14px; vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #fafcff; }
-  col.col-subject { width: 35%; }
-  col.col-status { width: 9%; }
-  col.col-num { width: 8%; }
-  col.col-rate { width: 15%; }
+  tr.thanks-row td { background: #fcfdff; }
 
-  .subject-cell { }
-  .subject-text { font-weight: 600; color: #1a2d4e; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-  .date-text { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .subject-text { font-weight: 600; color: #1a2d4e; font-size: 14px; }
+  .day-tag { display:inline-block; font-size:11px; color:#8a9bb5; margin-left:6px; }
 
-  /* 開封率バー */
-  .rate-cell { min-width: 130px; }
+  .rate-cell { min-width: 140px; }
   .rate-value { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
   .rate-bar-bg { background: #eef0f5; border-radius: 4px; height: 6px; width: 100%; }
   .rate-bar { height: 6px; border-radius: 4px; transition: width 0.6s ease; }
@@ -107,311 +120,152 @@
   .rate-good { color: #27ae60; }
   .rate-ok { color: #f39c12; }
   .rate-low { color: #e74c3c; }
+  .rate-none { color: #c5ccd6; }
 
   .num-cell { font-size: 15px; font-weight: 600; color: #444; text-align: right; }
-  .num-label { font-size: 11px; color: #aaa; text-align: right; }
+  .num-label { font-size: 11px; color: #aaa; text-align: right; margin-top: 2px; }
+  .num-muted { color: #c5ccd6; }
 
-  /* ステータスバッジ */
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .badge-sent { background: #e8f5e9; color: #27ae60; }
-  .badge-draft { background: #f5f5f5; color: #999; }
-  .badge-scheduled { background: #fff3e0; color: #f39c12; }
-
-  /* ローディング・エラー */
   .loading { padding: 60px; text-align: center; color: #aaa; font-size: 15px; }
   .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #e0e6ff; border-top-color: #3b6ef6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .error-msg { padding: 40px; text-align: center; color: #e74c3c; font-size: 14px; }
-  .error-msg a { color: #3b6ef6; }
-  .empty { padding: 60px; text-align: center; color: #aaa; font-size: 14px; }
 
-  /* ラストアップデート */
-  .last-updated { font-size: 12px; color: #aaa; margin-top: 12px; text-align: right; }
+  .last-updated { font-size: 12px; color: #aaa; margin-top: 14px; text-align: right; }
+  .reset-link { font-size: 11px; color: #c5ccd6; text-decoration: none; }
+  .reset-link:hover { color: #e74c3c; }
 
-  /* デモバナー */
-  .demo-banner { background: #fff8e1; border-bottom: 1px solid #ffe082; padding: 10px 32px; font-size: 13px; color: #795548; display: flex; align-items: center; gap: 12px; }
-  .demo-banner a { color: #3b6ef6; font-weight: 600; text-decoration: none; }
-  .demo-banner a:hover { text-decoration: underline; }
+  @media (max-width: 760px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📧 ステップメール 送信管理ダッシュボード</h1>
-  <a href="/settings">⚙️ API設定</a>
+  <h1>📧 ステップメール トラッキング</h1>
+  <div class="header-links">
+    <a href="/pixel-urls">📋 ピクセルURL一覧</a>
+    <a href="/settings">⚙️ API設定</a>
+  </div>
 </header>
-
-{% if demo %}
-<div class="demo-banner">
-  📋 <strong>デモモード</strong>：サンプルデータを表示しています。
-  実際のWixデータを見るには <a href="/settings">APIキーを設定</a> してください。
-</div>
-{% endif %}
 
 <div class="container">
 
-  <!-- トラッキング統計 -->
-  <div class="table-card" style="margin-bottom:32px;">
-    <div class="table-header">
-      <h2>👁️ ステップメール 開封トラッキング（リアルタイム）</h2>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <a href="/pixel-urls" style="font-size:13px;color:#3b6ef6;text-decoration:none;font-weight:600;">📋 ピクセルURL一覧</a>
-        <button class="refresh-btn" onclick="loadTracking()">🔄 更新</button>
-      </div>
-    </div>
-    <div style="padding:12px 24px;background:#f8faff;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:13px;color:#666;">登録者数（送信数）：</span>
-      <input type="number" id="total-sent-input" placeholder="例: 50" style="width:100px;padding:6px 10px;border:1px solid #dde;border-radius:6px;font-size:13px;">
-      <button class="refresh-btn" onclick="saveSent()">保存</button>
-      <span id="sent-saved" style="font-size:12px;color:#27ae60;display:none;">✅ 保存しました</span>
-    </div>
-    <div id="tracking-container">
-      <div class="loading"><div class="spinner"></div><br>読み込み中...</div>
-    </div>
-  </div>
-
-  <!-- サマリーカード -->
+  <!-- サマリーカード（実データ） -->
   <div class="summary-grid">
-    <div class="summary-card">
-      <div class="label">総送信数</div>
-      <div class="value" id="total-sent">—</div>
-      <div class="sub">全キャンペーン合計</div>
-    </div>
     <div class="summary-card highlight">
+      <div class="label">登録者数</div>
+      <div class="value" id="sum-subscribers">—</div>
+      <div class="sub">Wixから自動連携</div>
+    </div>
+    <div class="summary-card">
       <div class="label">総開封数</div>
-      <div class="value" id="total-opened">—</div>
-      <div class="sub">ユニーク開封</div>
+      <div class="value" id="sum-opens">—</div>
+      <div class="sub">全メール ユニーク開封</div>
     </div>
     <div class="summary-card green">
       <div class="label">平均開封率</div>
-      <div class="value" id="avg-open-rate">—</div>
-      <div class="sub">業界平均: 20〜25%</div>
+      <div class="value" id="sum-openrate">—</div>
+      <div class="sub">配信済みメールの平均</div>
     </div>
-    <div class="summary-card">
-      <div class="label">キャンペーン数</div>
-      <div class="value" id="total-campaigns">—</div>
-      <div class="sub">送信済み</div>
+    <div class="summary-card orange">
+      <div class="label">総クリック数</div>
+      <div class="value" id="sum-clicks">—</div>
+      <div class="sub">リンククリック合計</div>
     </div>
   </div>
 
-  <!-- テーブル -->
+  <!-- トラッキング表 -->
   <div class="table-card">
     <div class="table-header">
-      <h2>メール送信履歴・開封率</h2>
-      <button class="refresh-btn" id="refresh-btn" onclick="loadData()">🔄 更新</button>
+      <h2>👁️ メール別 開封・クリック状況</h2>
+      <div class="header-actions">
+        <button class="refresh-btn" id="refresh-btn" onclick="loadTracking()">🔄 更新</button>
+      </div>
+    </div>
+    <div class="info-bar">
+      ℹ️ <span>送信数は登録日からの経過日数で自動計算されます（例：Day3は3日以上前に登録した人数）。開封数は1人につき1回のみカウントします。</span>
     </div>
     <div class="table-scroll">
-      <div id="table-container">
-        <div class="loading">
-          <div class="spinner"></div><br>
-          データを読み込み中...
-        </div>
+      <div id="tracking-container">
+        <div class="loading"><div class="spinner"></div><br>読み込み中...</div>
       </div>
     </div>
   </div>
 
-  <div class="last-updated" id="last-updated"></div>
+  <div class="last-updated">
+    <span id="last-updated"></span>
+    &nbsp;|&nbsp;
+    <a href="#" class="reset-link" onclick="resetOpens(event)">テスト開封データをリセット</a>
+  </div>
 </div>
 
 <script>
-const IS_DEMO = {{ 'true' if demo else 'false' }};
-
-async function loadData() {
-  const btn = document.getElementById('refresh-btn');
-  btn.disabled = true;
-  btn.textContent = '読み込み中...';
-
-  document.getElementById('table-container').innerHTML = `
-    <div class="loading">
-      <div class="spinner"></div><br>
-      ${IS_DEMO ? 'デモデータを表示中...' : 'Wix APIからデータを取得中...'}
-    </div>
-  `;
-
-  try {
-    const endpoint = IS_DEMO ? '/api/campaigns/demo' : '/api/campaigns';
-    const res = await fetch(endpoint);
-    const data = await res.json();
-
-    if (data.error) {
-      document.getElementById('table-container').innerHTML = `
-        <div class="error-msg">
-          ⚠️ ${data.error}<br><br>
-          <a href="/settings">API設定を確認する →</a>
-        </div>
-      `;
-      return;
-    }
-
-    const campaigns = data.campaigns;
-    updateSummary(campaigns);
-    renderTable(campaigns);
-
-    const now = new Date();
-    document.getElementById('last-updated').textContent =
-      `最終更新: ${now.toLocaleString('ja-JP')}`;
-  } catch (e) {
-    document.getElementById('table-container').innerHTML = `
-      <div class="error-msg">
-        ⚠️ サーバーへの接続に失敗しました<br>
-        <small>${e.message}</small>
-      </div>
-    `;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🔄 更新';
-  }
-}
-
-function updateSummary(campaigns) {
-  const sent = campaigns.reduce((s, c) => s + (c.sent || 0), 0);
-  const opened = campaigns.reduce((s, c) => s + (c.opened || 0), 0);
-  const sentCampaigns = campaigns.filter(c => c.sent > 0);
-  const avgRate = sentCampaigns.length > 0
-    ? (sentCampaigns.reduce((s, c) => s + c.open_rate, 0) / sentCampaigns.length).toFixed(1)
-    : '—';
-
-  document.getElementById('total-sent').textContent = sent.toLocaleString();
-  document.getElementById('total-opened').textContent = opened.toLocaleString();
-  document.getElementById('avg-open-rate').textContent = avgRate !== '—' ? avgRate + '%' : '—';
-  document.getElementById('total-campaigns').textContent = sentCampaigns.length;
-}
-
-function rateClass(rate) {
+function rateClass(rate, sent) {
+  if (sent === 0) return 'rate-none';
   if (rate >= 30) return 'rate-good';
   if (rate >= 15) return 'rate-ok';
   return 'rate-low';
 }
 
-function statusBadge(status) {
-  if (!status) return '';
-  const map = {
-    SENT: ['badge-sent', '送信済み'],
-    DRAFT: ['badge-draft', '下書き'],
-    SCHEDULED: ['badge-scheduled', '予約済み'],
-    PUBLISHED: ['badge-sent', '送信済み'],
-  };
-  const s = status.toUpperCase();
-  const [cls, label] = map[s] || ['badge-draft', status];
-  return `<span class="badge ${cls}">${label}</span>`;
-}
-
-function renderTable(campaigns) {
-  if (campaigns.length === 0) {
-    document.getElementById('table-container').innerHTML = `
-      <div class="empty">キャンペーンが見つかりませんでした</div>
-    `;
-    return;
-  }
-
-  const rows = campaigns.map(c => `
-    <tr>
-      <td class="subject-cell">
-        <div class="subject-text" title="${c.subject}">${c.subject}</div>
-        <div class="date-text">📅 ${c.sent_date}</div>
-      </td>
-      <td>${statusBadge(c.status)}</td>
-      <td class="num-cell">
-        ${c.sent.toLocaleString()}
-        <div class="num-label">送信</div>
-      </td>
-      <td class="num-cell">
-        ${c.opened.toLocaleString()}
-        <div class="num-label">開封</div>
-      </td>
-      <td class="rate-cell">
-        <div class="rate-value ${rateClass(c.open_rate)}">${c.open_rate}%</div>
-        <div class="rate-bar-bg">
-          <div class="rate-bar open-bar" style="width: ${Math.min(c.open_rate, 100)}%"></div>
-        </div>
-      </td>
-      <td class="num-cell">
-        ${c.clicked.toLocaleString()}
-        <div class="num-label">クリック</div>
-      </td>
-      <td class="rate-cell">
-        <div class="rate-value ${rateClass(c.click_rate)}">${c.click_rate}%</div>
-        <div class="rate-bar-bg">
-          <div class="rate-bar click-bar" style="width: ${Math.min(c.click_rate, 100)}%"></div>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-
-  document.getElementById('table-container').innerHTML = `
-    <table>
-      <colgroup>
-        <col class="col-subject">
-        <col class="col-status">
-        <col class="col-num">
-        <col class="col-num">
-        <col class="col-rate">
-        <col class="col-num">
-        <col class="col-rate">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>件名 / 送信日</th>
-          <th>ステータス</th>
-          <th style="text-align:right">送信数</th>
-          <th style="text-align:right">開封数</th>
-          <th>開封率</th>
-          <th style="text-align:right">クリック数</th>
-          <th>クリック率</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-async function saveSent() {
-  const val = document.getElementById('total-sent-input').value;
-  if (!val) return;
-  await fetch('/api/tracking/set_sent', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({total_sent: parseInt(val)})});
-  document.getElementById('sent-saved').style.display = 'inline';
-  setTimeout(() => document.getElementById('sent-saved').style.display = 'none', 2000);
-  loadTracking();
-}
-
 async function loadTracking() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
   try {
     const res = await fetch('/api/tracking');
     const data = await res.json();
     if (data.error) {
-      document.getElementById('tracking-container').innerHTML = `<div class="error-msg">⚠️ ${data.error}</div>`;
+      document.getElementById('tracking-container').innerHTML =
+        `<div class="error-msg">⚠️ ${data.error}</div>`;
       return;
     }
-    if (data.total_sent > 0) {
-      document.getElementById('total-sent-input').placeholder = data.total_sent;
-    }
-    const rows = data.tracking.map(t => `
-      <tr>
-        <td class="subject-cell"><div class="subject-text">${t.label}</div></td>
-        <td class="num-cell">${t.sent > 0 ? t.sent.toLocaleString() : '—'}<div class="num-label">送信</div></td>
-        <td class="num-cell">${t.opens.toLocaleString()}<div class="num-label">開封</div></td>
-        <td class="rate-cell">
-          <div class="rate-value ${rateClass(t.open_rate)}">${t.sent > 0 ? t.open_rate+'%' : '—'}</div>
-          <div class="rate-bar-bg"><div class="rate-bar open-bar" style="width:${Math.min(t.open_rate,100)}%"></div></div>
-        </td>
-        <td class="num-cell">${t.clicks.toLocaleString()}<div class="num-label">クリック</div></td>
-        <td class="rate-cell">
-          <div class="rate-value ${rateClass(t.click_rate)}">${t.sent > 0 ? t.click_rate+'%' : '—'}</div>
-          <div class="rate-bar-bg"><div class="rate-bar click-bar" style="width:${Math.min(t.click_rate,100)}%"></div></div>
-        </td>
-      </tr>
-    `).join('');
+
+    // サマリー集計
+    const totalOpens = data.tracking.reduce((s, t) => s + t.opens, 0);
+    const totalClicks = data.tracking.reduce((s, t) => s + t.clicks, 0);
+    const sentDays = data.tracking.filter(t => t.sent > 0);
+    const avgOpen = sentDays.length > 0
+      ? (sentDays.reduce((s, t) => s + t.open_rate, 0) / sentDays.length).toFixed(1)
+      : null;
+
+    document.getElementById('sum-subscribers').textContent = (data.total_subscribers || 0).toLocaleString();
+    document.getElementById('sum-opens').textContent = totalOpens.toLocaleString();
+    document.getElementById('sum-clicks').textContent = totalClicks.toLocaleString();
+    document.getElementById('sum-openrate').textContent = avgOpen !== null ? avgOpen + '%' : '—';
+
+    // テーブル
+    const rows = data.tracking.map(t => {
+      const isThanks = t.day === 0;
+      const sentDisplay = t.sent > 0
+        ? t.sent.toLocaleString()
+        : '<span class="num-muted">0</span>';
+      const rateDisplay = t.sent > 0 ? t.open_rate + '%' : '—';
+      const clickRateDisplay = t.sent > 0 ? t.click_rate + '%' : '—';
+      return `
+        <tr class="${isThanks ? 'thanks-row' : ''}">
+          <td>
+            <span class="subject-text">${t.label}</span>
+            ${isThanks ? '<span class="day-tag">登録直後</span>' : '<span class="day-tag">登録' + t.day + '日後</span>'}
+          </td>
+          <td class="num-cell">${sentDisplay}<div class="num-label">送信</div></td>
+          <td class="num-cell">${t.opens.toLocaleString()}<div class="num-label">開封</div></td>
+          <td class="rate-cell">
+            <div class="rate-value ${rateClass(t.open_rate, t.sent)}">${rateDisplay}</div>
+            <div class="rate-bar-bg"><div class="rate-bar open-bar" style="width:${Math.min(t.open_rate,100)}%"></div></div>
+          </td>
+          <td class="num-cell">${t.clicks.toLocaleString()}<div class="num-label">クリック</div></td>
+          <td class="rate-cell">
+            <div class="rate-value ${rateClass(t.click_rate, t.sent)}">${clickRateDisplay}</div>
+            <div class="rate-bar-bg"><div class="rate-bar click-bar" style="width:${Math.min(t.click_rate,100)}%"></div></div>
+          </td>
+        </tr>`;
+    }).join('');
+
     document.getElementById('tracking-container').innerHTML = `
       <table>
-        <colgroup><col style="width:35%"><col style="width:8%"><col style="width:8%"><col style="width:15%"><col style="width:8%"><col style="width:15%"></colgroup>
         <thead><tr>
-          <th>件名</th>
+          <th>メール</th>
           <th style="text-align:right">送信数</th>
           <th style="text-align:right">開封数</th>
           <th>開封率</th>
@@ -420,14 +274,27 @@ async function loadTracking() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
-  } catch(e) {
-    document.getElementById('tracking-container').innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
+
+    document.getElementById('last-updated').textContent =
+      '最終更新: ' + new Date().toLocaleString('ja-JP');
+  } catch (e) {
+    document.getElementById('tracking-container').innerHTML =
+      `<div class="error-msg">⚠️ サーバー接続に失敗しました<br><small>${e.message}</small></div>`;
+  } finally {
+    btn.disabled = false;
   }
 }
 
-// 起動時に自動読み込み
-loadData();
+async function resetOpens(ev) {
+  ev.preventDefault();
+  if (!confirm('開封・クリックのテストデータを全て削除します。\n登録者数は保持されます。よろしいですか？')) return;
+  await fetch('/api/tracking/reset_opens', { method: 'POST' });
+  loadTracking();
+}
+
 loadTracking();
+// 60秒ごとに自動更新
+setInterval(loadTracking, 60000);
 </script>
 </body>
 </html>
