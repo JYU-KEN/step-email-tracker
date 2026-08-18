@@ -288,7 +288,22 @@ async function loadTracking() {
 async function resetOpens(ev) {
   ev.preventDefault();
   if (!confirm('開封・クリックのテストデータを全て削除します。\n登録者数は保持されます。よろしいですか？')) return;
-  await fetch('/api/tracking/reset_opens', { method: 'POST' });
+  let token = sessionStorage.getItem('adminToken') || '';
+  if (!token) {
+    token = prompt('管理トークンを入力してください') || '';
+    if (!token) return;
+  }
+  const res = await fetch('/api/tracking/reset_opens', {
+    method: 'POST',
+    headers: { 'X-Admin-Token': token }
+  });
+  if (res.status === 403) {
+    sessionStorage.removeItem('adminToken');
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || '管理トークンが正しくありません');
+    return;
+  }
+  sessionStorage.setItem('adminToken', token);
   loadTracking();
 }
 

@@ -45,10 +45,17 @@
       4. 「適用」→「保存して続行する」
     </div>
 
+    <div class="step">
+      <strong>より正確に計測する場合：</strong><br>
+      登録APIが返す tracking_token を、URL末尾の「購読者トークン」と置き換えてください。<br>
+      置き換えられない場合も、従来どおりIP単位で開封をカウントします。
+    </div>
+
     {% for day, label in step_emails.items()|sort %}
     <div class="day-item">
       <div class="day-label">{{ label }}</div>
-      <div class="pixel-tag" id="code-{{ day }}">&lt;img src="{{ urls[day] }}" width="1" height="1" style="display:block;width:1px;height:1px;" /&gt;</div>
+      <div class="pixel-tag" id="code-{{ day }}">&lt;img src="{{ token_urls[day] }}" width="1" height="1" style="display:block;width:1px;height:1px;" /&gt;</div>
+      <div class="pixel-tag" id="legacy-code-{{ day }}">&lt;img src="{{ urls[day] }}" width="1" height="1" style="display:block;width:1px;height:1px;" /&gt;</div>
       <button class="copy-btn" onclick="copyCode({{ day }})">📋 コピー</button>
     </div>
     {% endfor %}

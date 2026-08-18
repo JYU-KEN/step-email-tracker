@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+
+# 案件資料（機密）
+*.pdf
